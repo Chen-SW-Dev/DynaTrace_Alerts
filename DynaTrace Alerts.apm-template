@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ArrayOfApplicationTemplate xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.solarwinds.com/2007/08/APM">
+	<ApplicationTemplate>
+		<Settings xmlns:s="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+			<s:KeyValueOfstringSettingValueyR_SGpLPx>
+				<s:Key>__DebugLoggingEnabled</s:Key>
+				<s:Value>
+					<Required>true</Required>
+					<SettingLevel>Template</SettingLevel>
+					<Value>False</Value>
+					<ValueType>Boolean</ValueType>
+					<Key i:nil="true" />
+				</s:Value>
+			</s:KeyValueOfstringSettingValueyR_SGpLPx>
+			<s:KeyValueOfstringSettingValueyR_SGpLPx>
+				<s:Key>__NumberOfLogFilesToKeep</s:Key>
+				<s:Value>
+					<Required>true</Required>
+					<SettingLevel>Template</SettingLevel>
+					<Value>30</Value>
+					<ValueType>Integer</ValueType>
+					<Key i:nil="true" />
+				</s:Value>
+			</s:KeyValueOfstringSettingValueyR_SGpLPx>
+			<s:KeyValueOfstringSettingValueyR_SGpLPx>
+				<s:Key>__Timeout</s:Key>
+				<s:Value>
+					<Required>true</Required>
+					<SettingLevel>Template</SettingLevel>
+					<Value>300</Value>
+					<ValueType>Integer</ValueType>
+					<Key i:nil="true" />
+				</s:Value>
+			</s:KeyValueOfstringSettingValueyR_SGpLPx>
+			<s:KeyValueOfstringSettingValueyR_SGpLPx>
+				<s:Key>__Use64Bit</s:Key>
+				<s:Value>
+					<Required>true</Required>
+					<SettingLevel>Template</SettingLevel>
+					<Value>False</Value>
+					<ValueType>Boolean</ValueType>
+					<Key i:nil="true" />
+				</s:Value>
+			</s:KeyValueOfstringSettingValueyR_SGpLPx>
+		</Settings>
+		<ComponentTemplates>
+			<ComponentTemplate>
+				<ComponentOrder>1</ComponentOrder>
+				<Id>5555</Id>
+				<Name>Current Alerts</Name>
+				<Settings xmlns:s="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>__Disabled</s:Key>
+						<s:Value>
+							<Required>false</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>False</Value>
+							<ValueType>Boolean</ValueType>
+							<Key>__Disabled</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>__UserDescription</s:Key>
+						<s:Value>
+							<Required>false</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value></Value>
+							<ValueType>String</ValueType>
+							<Key>__UserDescription</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>__UserNotes</s:Key>
+						<s:Value>
+							<Required>false</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value></Value>
+							<ValueType>String</ValueType>
+							<Key>__UserNotes</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>ScriptArguments</s:Key>
+						<s:Value>
+							<Required>false</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value></Value>
+							<ValueType>String</ValueType>
+							<Key>ScriptArguments</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>__CredentialSetId</s:Key>
+						<s:Value>
+							<Required>false</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>0</Value>
+							<ValueType>String</ValueType>
+							<Key>__CredentialSetId</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>ScriptBody</s:Key>
+						<s:Value>
+							<Required>true</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>#DynaTrace Alert Integration With SolarWinds
+#Created By Chen Ashkenazi, Oct 2021.
+#The Script uses REST API to access Dynatrace for Open "Problems" and then stores it in a json file on the SW server.
+#Then the script formatting this file and goes over each problem in a loop
+#By going over the problems, the script generates a SolarWinds Alert file from template with the relavnt information 
+#The alert checks if there is existing alert with the same problem ID in the database before importing it.
+#
+#
+add-type @"
+    using System.Net;
+    using System.Security.Cryptography.X509Certificates;
+    public class TrustAllCertsPolicy : ICertificatePolicy {
+        public bool CheckValidationResult(
+            ServicePoint srvPoint, X509Certificate certificate,
+            WebRequest request, int certificateProblem) {
+            return true;
+        }
+    }
+"@
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+
+#SWIS Connection
+
+$username = ''
+$password = ''
+$server = 'localhost' 
+$swis = Connect-Swis -UserName $username -Password $password -IgnoreSslErrors
+
+#REST API Access Info
+$Array = @()
+$endpointUri = ""
+
+#Access Parameters
+
+$params = @{
+Uri = $endpointUri
+Headers = @{Authorization=("Api-Token {0}" -f $base64AuthInfo)}
+Method = 'Get'
+ContentType = 'application/json'
+}
+
+#Getting REST response, formatting and automatic create alert to SolarWinds
+
+
+$restResponse = (Invoke-RestMethod @params).problems | ConvertTo-Json | Set-Content C:\SolarWindsScripts\dyna.json
+$json = Get-Content -Raw -Path C:\SolarWindsScripts\dyna.json | ConvertFrom-Json
+
+foreach ($i in $json){
+	$currentID = $i.displayId
+	$imp = $i.impactLevel
+	$subject = $i.title
+	$con = Get-Content C:\SolarWindsScripts\AlertTemplate\DynaTrace+Problem+xxxxxx.xml
+	$con | % { $_.Replace("DynaTrace Problem xxxxxx", "DynaTrace Problem $currentID")} | Set-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con1 = Get-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con1 | % { $_.Replace("RPLCMSG", $currentID) } | Set-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con2 = Get-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con2 | % { $_.Replace("SMSTEXT", "Dynatrace Alert - $subject, $imp - $currentID ") } | Set-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con3 = Get-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con3 | % { $_.Replace("LOGTEXT", "Problem $currentID opened") } | Set-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con4 = Get-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con4 | % { $_.Replace("SRESETTEXT", "Dynatrace Alert Resolved - $subject, $imp - $currentID") } | Set-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con5 = Get-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$con5 | % { $_.Replace("LRESETTEXT", "Problem $currentID closed") } | Set-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml
+	$AlertXml = Get-Content C:\SolarWindsScripts\CreatedAlerts\$currentID.xml -Raw
+	$idSWQL = "%$currentID%"
+	$checkAlert = Get-SwisData $swis 'SELECT Name From Orion.AlertConfigurations WHERE Name like @v' @{ v= $idSWQL }
+	If ($checkAlert){
+	write-host "Alert already exist in SolarWinds Database, ignoring import."
+	}
+	Else{
+	write-host "Importing Alert for $currentID..."
+	Invoke-SwisVerb $swis Orion.AlertConfigurations Import @($AlertXml)
+	write-host "Import Completed succesfully"
+	}	
+	}
+
+Write-Host "Message :" (Invoke-RestMethod @params).problems | ConvertTo-Json
+Write-Host "Statistic: 1"
+</Value>
+							<ValueType>External</ValueType>
+							<Key>ScriptBody</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>WrmPort</s:Key>
+						<s:Value>
+							<Required>true</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>5985</Value>
+							<ValueType>Integer</ValueType>
+							<Key>WrmPort</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>ImpersonateForLocalMode</s:Key>
+						<s:Value>
+							<Required>false</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>false</Value>
+							<ValueType>Boolean</ValueType>
+							<Key>ImpersonateForLocalMode</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>WrmUseSSL</s:Key>
+						<s:Value>
+							<Required>false</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>false</Value>
+							<ValueType>Boolean</ValueType>
+							<Key>WrmUseSSL</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>CountAsDifference</s:Key>
+						<s:Value>
+							<Required>false</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>false</Value>
+							<ValueType>Boolean</ValueType>
+							<Key>CountAsDifference</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>ExecutionMode</s:Key>
+						<s:Value>
+							<Required>false</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>LocalHost</Value>
+							<ValueType>Option</ValueType>
+							<Key>ExecutionMode</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>StatusRollupType</s:Key>
+						<s:Value>
+							<Required>true</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>Worst</Value>
+							<ValueType>Option</ValueType>
+							<Key>StatusRollupType</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+					<s:KeyValueOfstringSettingValueyR_SGpLPx>
+						<s:Key>WrmUrlPrefix</s:Key>
+						<s:Value>
+							<Required>true</Required>
+							<SettingLevel>Template</SettingLevel>
+							<Value>wsman</Value>
+							<ValueType>String</ValueType>
+							<Key>WrmUrlPrefix</Key>
+						</s:Value>
+					</s:KeyValueOfstringSettingValueyR_SGpLPx>
+				</Settings>
+				<Type>PowerShell</Type>
+				<Thresholds />
+				<EvidenceType>None</EvidenceType>
+				<CategoryDisplayName></CategoryDisplayName>
+				<ComponentCategoryId i:nil="true" />
+				<DynamicColumnSettings />
+				<VisibilityMode>Visible</VisibilityMode>
+				<ShortName></ShortName>
+				<ApplicationItemType></ApplicationItemType>
+				<ApplicationTemplateId>325</ApplicationTemplateId>
+				<UniqueId>bab68870-8546-4759-88d5-2307a40878f5</UniqueId>
+				<ComponentCategoryName i:nil="true" />
+				<IsApplicationItemSpecific>false</IsApplicationItemSpecific>
+			</ComponentTemplate>
+		</ComponentTemplates>
+		<DeletedComponentTemplates />
+		<Id>325</Id>
+		<Name>DynaTrace Alerts</Name>
+		<IsMockTemplate>false</IsMockTemplate>
+		<Description></Description>
+		<Tags />
+		<Created>2021-10-24T12:02:17.86Z</Created>
+		<LastModified>2021-10-24T12:04:51.42Z</LastModified>
+		<CustomApplicationType i:nil="true" />
+		<Version>1.0</Version>
+		<ViewID>0</ViewID>
+		<ViewXml i:nil="true" />
+		<ModuleVersion xmlns:d="http://schemas.datacontract.org/2004/07/System">
+			<d:_Build>5</d:_Build>
+			<d:_Major>2020</d:_Major>
+			<d:_Minor>2</d:_Minor>
+			<d:_Revision>17525</d:_Revision>
+		</ModuleVersion>
+		<UniqueId>34afed82-5b92-4f06-98ca-26411d49cc0a</UniqueId>
+	</ApplicationTemplate>
+</ArrayOfApplicationTemplate>
