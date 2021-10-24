@@ -10,3 +10,9 @@ This is a SAM template which contains a powershell script component that does th
 
 * The alert will clear automatlically once the original Problem ID isn't in open status anymore (not returned in the rest response).
 * The script will not create an alert if there is existing alert in Orion with the same Problem ID.
+
+
+
+----- Future steps ------
+
+* Add a automatic  removal of closed alerts from Orion database.
